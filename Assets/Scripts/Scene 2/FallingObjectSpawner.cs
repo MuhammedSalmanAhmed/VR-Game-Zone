@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement; // For reloading the scene
 
 public class FallingObjectSpawner : MonoBehaviour
 {
@@ -13,11 +14,15 @@ public class FallingObjectSpawner : MonoBehaviour
     [Header("Object Settings")]
     public float objectFallSpeed = 5f; // Speed at which the objects fall
 
+    [Header("Collision Settings")]
+    public GameObject floor; // The floor object to detect collisions
+    public GameObject player; // The player object (XR Origin)
+
     private float spawnTimer;
 
     void Start()
     {
-        // Start the spawn timer
+        // Initialize the spawn timer
         spawnTimer = spawnInterval;
     }
 
@@ -44,9 +49,9 @@ public class FallingObjectSpawner : MonoBehaviour
         // Randomly select an object to spawn
         GameObject objectToSpawn = objectsToSpawn[Random.Range(0, objectsToSpawn.Length)];
 
-        // Randomly select a spawn position along the line
-        float spawnPositionX = Random.Range(spawnLineStart.position.x, spawnLineEnd.position.x);
-        Vector3 spawnPosition = new Vector3(spawnPositionX, spawnLineStart.position.y, spawnLineStart.position.z);
+        // Select a spawn position strictly along the spawn line
+        float t = Random.Range(0f, 1f); // Interpolation factor between 0 (start) and 1 (end)
+        Vector3 spawnPosition = Vector3.Lerp(spawnLineStart.position, spawnLineEnd.position, t);
 
         // Instantiate the object at the spawn position
         GameObject spawnedObject = Instantiate(objectToSpawn, spawnPosition, Quaternion.identity);
@@ -60,15 +65,42 @@ public class FallingObjectSpawner : MonoBehaviour
 
         rb.useGravity = false; // Disable default gravity
         rb.velocity = Vector3.down * objectFallSpeed; // Add custom downward velocity
+
+        // Add a CollisionHandler script to handle destruction and restart logic
+        CollisionHandler collisionHandler = spawnedObject.AddComponent<CollisionHandler>();
+        collisionHandler.floor = floor; // Assign the floor object
+        collisionHandler.player = player; // Assign the player object
     }
 
     private void OnDrawGizmos()
     {
-        // Draw the spawn line in the Scene view
+        // Draw the spawn line in the Scene view for visualization
         if (spawnLineStart != null && spawnLineEnd != null)
         {
             Gizmos.color = Color.green;
             Gizmos.DrawLine(spawnLineStart.position, spawnLineEnd.position);
+        }
+    }
+}
+
+public class CollisionHandler : MonoBehaviour
+{
+    public GameObject floor; // The floor object
+    public GameObject player; // The player object (XR Origin)
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        // Check if the object collides with the assigned floor
+        if (collision.gameObject == floor)
+        {
+            Destroy(gameObject); // Destroy the object
+        }
+
+        // Check if the object collides with the player
+        if (collision.gameObject == player)
+        {
+            // Restart the current level
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
     }
 }
